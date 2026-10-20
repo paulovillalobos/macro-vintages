@@ -1,0 +1,59 @@
+# Local stack: PostgreSQL, the API and two worker replicas.
+#
+#   docker compose up --build -d
+#   docker compose exec api macro-vintages create-key --name demo
+#   curl -H "X-API-Key: <key>" localhost:8000/v1/series
+#
+# Workers fetch the live ECB and Eurostat APIs. The database password is for
+# this local stack only.
+
+x-app: &app
+  build: .
+  image: macro-vintages:local
+  environment:
+    MV_DATABASE_URL: postgresql://macro:macro@db:5432/macro_vintages
+    MV_LOG_LEVEL: INFO
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_USER: macro
+      POSTGRES_PASSWORD: macro
+      POSTGRES_DB: macro_vintages
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U macro -d macro_vintages"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  api:
+    <<: *app
+    command: ["api", "--workers", "2"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=2)"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    deploy:
+      replicas: 2
+    stop_grace_period: 30s
+
+volumes:
+  pgdata:

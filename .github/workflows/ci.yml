@@ -1,0 +1,92 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.13.1"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: macro_vintages_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      MV_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/macro_vintages_test
+      MV_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Lint, types, unit + integration + race tests with coverage
+        run: make test
+      - name: Each concurrency safeguard, removed, fails a test
+        run: make mutation-check
+      - name: Load test smoke (as-of reads must not change under concurrent writes)
+        run: >-
+          uv run --frozen python scripts/loadtest.py
+          --series 5 --periods 1000 --duration 5 --warmup 1
+          --clients 2 --concurrency 8 --api-workers 2
+          --out "$RUNNER_TEMP/loadtest.md"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-and-loadtest
+          path: |
+            coverage.xml
+            ${{ runner.temp }}/loadtest.md
+          if-no-files-found: ignore
+
+  docker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t macro-vintages:ci .
+      - name: Start PostgreSQL and the API container
+        run: |
+          docker network create mv
+          docker run -d --name db --network mv \
+            -e POSTGRES_USER=macro -e POSTGRES_PASSWORD=macro -e POSTGRES_DB=macro_vintages \
+            postgres:17-bookworm
+          until docker exec db pg_isready -U macro -d macro_vintages; do sleep 1; done
+          docker run -d --name api --network mv -p 8000:8000 \
+            -e MV_DATABASE_URL=postgresql://macro:macro@db:5432/macro_vintages \
+            macro-vintages:ci api --workers 2
+      - name: Ready, authenticated and serving the catalogue
+        run: |
+          for i in $(seq 1 60); do curl -sf localhost:8000/readyz && break; sleep 1; done
+          curl -sf localhost:8000/readyz
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/v1/series)" = 401
+          docker run --rm --network mv --entrypoint macro-vintages \
+            -e MV_DATABASE_URL=postgresql://macro:macro@db:5432/macro_vintages \
+            macro-vintages:ci sync-catalogue
+          key=$(docker exec api macro-vintages create-key --name ci | tail -n 1)
+          curl -sf -H "X-API-Key: $key" localhost:8000/v1/series | python3 -c \
+            "import json, sys; d = json.load(sys.stdin)['data']; assert len(d) == 10, d; print(len(d), 'series')"
+      - name: Container logs
+        if: always()
+        run: docker logs api 2>&1 | tail -n 50

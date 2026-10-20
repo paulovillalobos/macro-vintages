@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
 import re
 import statistics
 import time
@@ -39,7 +40,8 @@ from macro_vintages.sources.base import SourceObservation
 from macro_vintages.store import jobs, keys
 from macro_vintages.store.versions import apply_observations
 
-ADMIN_URL = "postgresql://postgres@127.0.0.1:5441/postgres"
+# Any database on the target server; the script creates and drops its own.
+ADMIN_URL = os.environ.get("MV_ADMIN_URL", "postgresql://postgres@127.0.0.1:5441/postgres")
 OUT = Path(__file__).resolve().parents[1] / "docs" / "results" / "explain.md"
 
 FILL_SQL = """

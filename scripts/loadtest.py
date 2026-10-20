@@ -55,7 +55,8 @@ from macro_vintages.sources.base import SourceObservation
 from macro_vintages.store import keys
 from macro_vintages.store.versions import apply_observations
 
-ADMIN_URL = "postgresql://postgres@127.0.0.1:5441/postgres"
+# Any database on the target server; the script creates and drops its own.
+ADMIN_URL = os.environ.get("MV_ADMIN_URL", "postgresql://postgres@127.0.0.1:5441/postgres")
 DB_NAME = "macro_vintages_load"
 DB_URL = ADMIN_URL.rsplit("/", 1)[0] + "/" + DB_NAME
 ROOT = Path(__file__).resolve().parents[1]
@@ -454,7 +455,7 @@ async def main(args: argparse.Namespace) -> int:
         "answers 304 unless the writer has changed the series since.",
         "",
     ]
-    OUT.write_text("\n".join(lines))
+    args.out.write_text("\n".join(lines))
     print("\n".join(lines))
     return 0 if ok else 1
 
@@ -470,4 +471,5 @@ if __name__ == "__main__":
     parser.add_argument("--api-workers", type=int, default=4)
     parser.add_argument("--port", type=int, default=8077)
     parser.add_argument("--keep", action="store_true", help="keep the load database")
+    parser.add_argument("--out", type=Path, default=OUT, help="where to write the report")
     raise SystemExit(asyncio.run(main(parser.parse_args())))
