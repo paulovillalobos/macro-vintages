@@ -69,11 +69,11 @@ Interactive docs are at `/docs`; the endpoints and error codes are in
  ECB SDMX CSV · Eurostat JSON-stat
 ```
 
-1. **Claim.** A worker slot takes one due job with `FOR UPDATE SKIP LOCKED`,
+1. Claim. A worker slot takes one due job with `FOR UPDATE SKIP LOCKED`,
    stamps a fresh lease token and opens an `ingest_run` row. Short transaction.
-2. **Fetch.** HTTP to the source with bounded retries and jitter, with no
+2. Fetch. HTTP to the source with bounded retries and jitter, with no
    transaction open and no pooled connection held.
-3. **Finish.** In one transaction: lock the job row, check the lease token is
+3. Finish. In one transaction: lock the job row, check the lease token is
    still ours, diff the payload against the current versions, close changed
    rows and insert new ones at a single `clock_timestamp()`, bump the series'
    `data_version`, schedule the next run.
@@ -91,10 +91,10 @@ on are in [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).
 
 On an Apple M4 laptop (client, API and PostgreSQL on the same machine):
 
-* **Hot queries**, from `EXPLAIN ANALYZE` on 280k version rows: latest page
+* Hot queries, from `EXPLAIN ANALYZE` on 280k version rows: latest page
   0.014 ms, as-of page 0.017 ms, revision feed 0.64 ms, job claim 0.034 ms
   ([docs/results/explain.md](docs/results/explain.md)).
-* **API under load**, 64 connections against 4 uvicorn workers while a
+* API under load, 64 connections against 4 uvicorn workers while a
   writer commits revisions underneath: 3,144 requests/s sustained over 30 s,
   p50 15.5 ms, p99 81 ms, no errors
   ([docs/results/loadtest.md](docs/results/loadtest.md)). The ceiling is Python

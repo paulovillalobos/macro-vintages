@@ -55,15 +55,15 @@ The download still happens, at 20–25 KB per series here.
 
 **Pitfalls the adapter handles:**
 
-* **Euro-area code changed.** Bulgaria joined the euro on 2026-01-01.
+* Euro-area code changed. Bulgaria joined the euro on 2026-01-01.
   `une_rt_m` dropped `EA20`, and `geo=EA20` now answers **200 with a
   zero-sized `geo` dimension and no values**, not an error. A zero-sized
   dimension is treated as schema drift, never as "no data". The catalogue
   uses `EA21` (GDP, unemployment) and `EA` (HICP).
-* **HICP dataset replaced.** `prc_hicp_manr` stops at 2025-12; the ECOICOP
+* HICP dataset replaced. `prc_hicp_manr` stops at 2025-12; the ECOICOP
   ver. 2 dataset `prc_hicp_minr` (filter `coicop18=TOTAL`) continues
   (last period 2026-09 at the time of the probe).
-* **An unknown filter value answers 413** `ASYNCHRONOUS_RESPONSE`
+* An unknown filter value answers 413 `ASYNCHRONOUS_RESPONSE`
   ("try again later"), and the same request later answers 200 with an empty
   dimension (17 s later in the probe). 413 is retried as Eurostat documents;
   the empty dimension then fails as drift.

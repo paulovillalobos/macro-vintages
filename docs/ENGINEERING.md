@@ -9,9 +9,9 @@ the scripts in `scripts/` regenerate.
 `observation_version` has one row per value the engine has held for one
 observation:
 
-* **valid time** is `period`, the `date` the period starts. One sortable
+* valid time is `period`, the `date` the period starts. One sortable
   column works for every frequency; the label (`2026-Q2`) is derived on output.
-* **transaction time** is `[known_from, known_to)`, when this engine held the
+* transaction time is `[known_from, known_to)`, when this engine held the
   value. `known_to IS NULL` marks the current version.
 
 A revision sets `known_to` on the current row and inserts the new row with
@@ -81,13 +81,13 @@ index `ingest_job_due`.
 
 Lifecycle:
 
-1. **Claim** (short transaction). `FOR UPDATE SKIP LOCKED` on the next due
+1. Claim (short transaction). `FOR UPDATE SKIP LOCKED` on the next due
    active job, then stamp a new random `lease_token`, `lease_owner` and
    `lease_expires_at`, and open an `ingest_run` row.
-2. **Fetch** with no transaction and no pooled connection held. A slow
+2. Fetch with no transaction and no pooled connection held. A slow
    source cannot pin row locks or exhaust the pool. The fetch is cut off at
    80% of the lease.
-3. **Finish** (short transaction). Lock the job row, compare the token with
+3. Finish (short transaction). Lock the job row, compare the token with
    the one claimed (**fencing**), write versions, reset attempts, schedule
    the next run, close the run row. If the token has changed, the lease
    expired and another worker took the job: the late result is discarded,
@@ -110,31 +110,31 @@ database serialise; the second finds the head already applied
 
 ## 4. API
 
-* **Async end to end**: FastAPI on asyncpg, one pool per uvicorn worker.
+* Async end to end: FastAPI on asyncpg, one pool per uvicorn worker.
   The request middleware is plain ASGI rather than `BaseHTTPMiddleware`,
   which wraps every response in an extra task and stream.
-* **Keyset pagination** on the index order (period, or `(known_to, period)`
+* Keyset pagination on the index order (period, or `(known_to, period)`
   for the revision feed). Deep pages cost the same as the first: 0.017 ms
   for both as-of pages in the benchmark. Cursors are opaque and carry a
   fingerprint of their query. Reusing one with other filters is a `400`,
   not a silently wrong page.
-* **ETags** come from `series.data_version`, which the writer increments in
+* ETags come from `series.data_version`, which the writer increments in
   the same transaction as the data. A matching `If-None-Match` returns `304`
   after one primary-key lookup. In the load test, 94% of conditional
   requests were 304s, even with a writer active.
-* **`as_of` in the future is refused.** Otherwise the same URL would
+* `as_of` in the future is refused. Otherwise the same URL would
   return different "historical" answers before and after the instant.
-* **API keys** are 32 random bytes, stored as SHA-256 digests. A slow KDF
+* API keys are 32 random bytes, stored as SHA-256 digests. A slow KDF
   protects low-entropy passwords; for random keys it would only add latency
   to every request.
-* **Rate limiting** is a token bucket on the key's row, consumed by one
+* Rate limiting is a token bucket on the key's row, consumed by one
   `UPDATE` that locks the row, refills it by elapsed time and spends a token.
   All API replicas share it with no extra infrastructure. A read-then-write
   limiter lets concurrent requests spend the same token. The test fires 300
   requests from 30 connections at a bucket of 25, and exactly 25 pass.
-* **Errors** are RFC 9457 problem documents whose `type` links to
+* Errors are RFC 9457 problem documents whose `type` links to
   [API.md](API.md), and they carry the request id.
-* **Operations:** `/healthz` (process), `/readyz` (database and schema
+* Operations: `/healthz` (process), `/readyz` (database and schema
   head, so a replica built for a newer schema reports not-ready until the
   migration has run), `/metrics` (Prometheus: requests by route template,
   latency, ingest runs and rows, source HTTP calls, rate-limit refusals),
@@ -144,27 +144,27 @@ database serialise; the second finds the head already applied
 
 ## 5. How correctness is tested
 
-* **Against a real PostgreSQL**, never a mock. Locking, `SKIP LOCKED`,
+* Against a real PostgreSQL, never a mock. Locking, `SKIP LOCKED`,
   exclusion constraints and MVCC are exactly the behaviour under test.
-* **Race tests use OS processes.** `tests/helpers/race_worker.py` runs the
+* Race tests use OS processes. `tests/helpers/race_worker.py` runs the
   production `Worker` with a deliberately slow fake source. The tests start
   6 processes on the same instant, or run them continuously while the source
   changes every 250 ms, or SIGKILL one mid-fetch. They then check the
   invariants in the database and in a fetch log the processes append to:
   no double fetch, no overlapping runs, contiguous version chains, no stale
   overwrite, no lost update.
-* **Property test** (Hypothesis): random sequences of payloads (insert,
+* Property test (Hypothesis): random sequences of payloads (insert,
   revise, withdraw, re-add, status-only changes). After each step the test
   records the expected snapshot, then checks that `as_of` reproduces every
   past snapshot exactly.
-* **Mutation check** (`make mutation-check`): removes each safeguard in a
+* Mutation check (`make mutation-check`): removes each safeguard in a
   temporary copy (`SKIP LOCKED`, the lease fence, the post-lock timestamp,
   the key row lock) and requires a test to fail each time. It also checks
   that the copy really shadows the installed package, so a "caught" cannot
   come from testing the unmutated code. One finding: the single-process
   claim test passes without `SKIP LOCKED`, because sequential claims never
   collide. Only the multi-process race test catches that mutation.
-* **Load test** (`scripts/loadtest.py`): reads at a fixed past instant are
+* Load test (`scripts/loadtest.py`): reads at a fixed past instant are
   compared with a snapshot while a writer commits revisions. 9,406 such
   reads, 0 mismatches.
 
@@ -224,21 +224,21 @@ All settings are environment variables (`src/macro_vintages/config.py`):
 
 ## 8. Known gaps
 
-* **History starts at first ingest.** Neither source serves past vintages
+* History starts at first ingest. Neither source serves past vintages
   (section on the ECB in [DATA_SOURCES.md](DATA_SOURCES.md)). ALFRED-style
   vintage backfill would need a different source.
-* **Transaction time is not release time.** A revision is dated when a
+* Transaction time is not release time. A revision is dated when a
   worker saw it, up to one polling interval after publication. Recording the
   publisher's own timestamp (Eurostat's `updated`) as a third time axis would
   close most of that gap.
-* **Eurostat is polled by full download**, since it offers no validators. At
+* Eurostat is polled by full download, since it offers no validators. At
   ten series that is about 75 KB every three hours; at thousands it would
   call for the bulk download service.
-* **The compose file has not been run with `docker compose`**, which is not
+* The compose file has not been run with `docker compose`, which is not
   installed on the development machine. The same topology (PostgreSQL, API,
   two workers on one network) was run with `docker run`, ingesting the live
   series. The CI workflow's two jobs were run locally step by step; the
   workflow itself has not yet run on GitHub.
-* **One PostgreSQL.** There is no read replica or failover. The API reads
+* One PostgreSQL. There is no read replica or failover. The API reads
   are single statements and could move to a replica, but the per-request key
   `UPDATE` would have to stay on the primary or move out of the database.
