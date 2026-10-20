@@ -72,7 +72,7 @@ probe: install
 	$(RUN) python scripts/probe_sources.py
 
 mutation-check: install
-	scripts/mutation_check.sh
+	$(RUN) python scripts/mutation_check.py
 
 docker-build:
 	docker build -t macro-vintages:local .
