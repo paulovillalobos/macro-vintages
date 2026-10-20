@@ -214,6 +214,14 @@ async def test_as_of_reconstructs_every_past_snapshot(
             "SELECT count(*) FROM observation_version WHERE known_to IS NULL"
         )
         assert current == len(history[-1])
+        # The catalogue stats maintained by the writer match a full recount.
+        stats = await conn.fetchrow(
+            "SELECT s.observations = b.n AND s.first_period IS NOT DISTINCT FROM b.lo "
+            "AND s.last_period IS NOT DISTINCT FROM b.hi AS ok FROM series s, "
+            "(SELECT count(*) AS n, min(period) AS lo, max(period) AS hi "
+            " FROM observation_version WHERE known_to IS NULL) b"
+        )
+        assert stats is not None and stats["ok"]
 
 
 async def test_transaction_time_is_read_after_the_series_lock(clean: asyncpg.Pool[Any]) -> None:

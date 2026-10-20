@@ -125,17 +125,15 @@ def _validate_as_of(as_of: datetime | None) -> datetime | None:
     return as_of
 
 
+# observations/first_period/last_period are maintained by the writer
+# (migration 0002); computing them here cost 13 ms per page against 0.3 ms
+# (docs/results/explain.md).
 _SERIES_SQL = """
 SELECT s.code, s.source, s.source_key, s.title, s.unit, s.frequency, s.data_version,
        s.data_changed_at, j.last_success_at, j.state AS ingest_state,
-       b.first_period, b.last_period, b.observations
+       s.first_period, s.last_period, s.observations
 FROM series s
 JOIN ingest_job j ON j.series_id = s.id
-CROSS JOIN LATERAL (
-    SELECT min(period) AS first_period, max(period) AS last_period, count(*) AS observations
-    FROM observation_version v
-    WHERE v.series_id = s.id AND v.known_to IS NULL
-) b
 """
 
 

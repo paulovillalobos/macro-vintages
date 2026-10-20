@@ -91,9 +91,22 @@ async def apply_observations(
         withdrawn=withdrawn,
     )
     if counts.changed:
+        # Revisions do not change the count; new periods and withdrawals do. The
+        # bounds are two index probes on observation_current.
         await conn.execute(
-            "UPDATE series SET data_version = data_version + 1, data_changed_at = $2 WHERE id = $1",
+            """
+            UPDATE series
+            SET data_version = data_version + 1,
+                data_changed_at = $2,
+                observations = observations + $3,
+                first_period = (SELECT min(period) FROM observation_version
+                                WHERE series_id = $1 AND known_to IS NULL),
+                last_period = (SELECT max(period) FROM observation_version
+                               WHERE series_id = $1 AND known_to IS NULL)
+            WHERE id = $1
+            """,
             series_id,
             ts,
+            counts.inserted - counts.withdrawn,
         )
     return counts, ts

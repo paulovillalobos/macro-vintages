@@ -2,6 +2,8 @@
 # Local PostgreSQL for development and tests, without Docker.
 # Uses the Homebrew binaries, a data directory inside the repo (.local/pg)
 # and its own port so it never collides with another Postgres on the machine.
+# WAL is capped at 128 MB: the default (1 GB) filled a nearly full laptop disk
+# during the write benchmarks in scripts/explain.py.
 #
 #   scripts/dev-db.sh up     initdb on first use, then start
 #   scripts/dev-db.sh down   stop
@@ -21,7 +23,7 @@ case "${1:-up}" in
     fi
     if ! "$PG_BIN/pg_ctl" -D "$DATA" status >/dev/null 2>&1; then
       LC_ALL=C "$PG_BIN/pg_ctl" -D "$DATA" -w \
-        -o "-p $PORT -k /tmp -c max_connections=200 -c shared_buffers=256MB" \
+        -o "-p $PORT -k /tmp -c max_connections=200 -c shared_buffers=256MB -c max_wal_size=128MB -c min_wal_size=32MB" \
         -l "$ROOT/.local/pg.log" start >/dev/null
     fi
     for db in macro_vintages macro_vintages_test; do

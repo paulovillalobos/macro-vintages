@@ -96,7 +96,7 @@ async def test_rate_limit_returns_429_with_retry_after(api: Api) -> None:
 async def test_health_and_metrics_need_no_key(api: Api) -> None:
     assert (await api.client.get("/healthz")).json() == {"status": "ok", "checks": {}}
     ready = await api.client.get("/readyz")
-    assert ready.status_code == 200 and ready.json()["checks"]["schema"] == "0001"
+    assert ready.status_code == 200 and ready.json()["checks"]["schema"] == "0002"
     await api.get("/v1/series")
     metrics = (await api.client.get("/metrics")).text
     assert 'mv_http_requests_total{method="GET",route="/v1/series",status="200"}' in metrics
@@ -108,7 +108,7 @@ async def test_readyz_fails_when_schema_is_behind(api: Api) -> None:
         try:
             r = await api.client.get("/readyz")
         finally:
-            await conn.execute("UPDATE alembic_version SET version_num = '0001'")
+            await conn.execute("UPDATE alembic_version SET version_num = '0002'")
     assert r.status_code == 503 and r.json()["checks"]["schema"] == "behind"
 
 
