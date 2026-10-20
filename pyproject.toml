@@ -1,0 +1,88 @@
+[project]
+name = "macro-vintages"
+version = "0.1.0"
+description = "Ingests ECB and Eurostat series into a bitemporal PostgreSQL store and serves as-of queries and revision history over an async API."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Paulo Villalobos" }]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13",
+    "asyncpg>=0.30",
+    "fastapi>=0.115",
+    "httpx>=0.28",
+    "prometheus-client>=0.21",
+    "sqlalchemy[asyncio]>=2.0",
+    "uvicorn>=0.32",
+]
+
+[project.scripts]
+macro-vintages = "macro_vintages.cli:main"
+
+[dependency-groups]
+dev = [
+    "asyncpg-stubs>=0.30",
+    "hypothesis>=6.115",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["uv_build>=0.8,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "ASYNC", "S", "PT", "TRY", "PERF"]
+ignore = [
+    "S101",   # assert is fine in tests and for type narrowing
+    "S311",   # random is used for jitter, not for secrets
+    "TRY003", # long messages in exception constructors are fine here
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S105", "S106", "S108",
+    "PT018",  # compound asserts read better for multi-field state checks
+]
+"migrations/**" = ["E501"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = ["src", "tests", "scripts", "migrations"]
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["hypothesis.*"]
+follow_untyped_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+testpaths = ["tests"]
+markers = [
+    "integration: needs a real PostgreSQL (MV_TEST_DATABASE_URL)",
+    "race: spawns concurrent worker processes",
+]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["macro_vintages"]
+branch = true
+concurrency = ["thread", "multiprocessing"]
+parallel = true
+sigterm = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]

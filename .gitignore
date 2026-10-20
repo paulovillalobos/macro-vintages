@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[oc]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+dist/
+
+# Local PostgreSQL data, logs and dev keys (scripts/dev-db.sh)
+.local/
