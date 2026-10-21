@@ -64,7 +64,7 @@ Errors are `application/problem+json` (RFC 9457):
 
 ```json
 {
-  "type": "https://github.com/imperiobaal69-web/macro-vintages/blob/main/docs/API.md#series-not-found",
+  "type": "https://github.com/paulovillalobos/macro-vintages/blob/main/docs/API.md#series-not-found",
   "title": "Not found",
   "status": 404,
   "detail": "no series 'ecb.exr.xxx'",

@@ -10,7 +10,7 @@ from macro_vintages.sources.ecb import EcbSource
 from macro_vintages.sources.eurostat import EurostatSource
 from macro_vintages.sources.http import RetryPolicy
 
-USER_AGENT = "macro-vintages/0.1 (+https://github.com/imperiobaal69-web/macro-vintages)"
+USER_AGENT = "macro-vintages/0.1 (+https://github.com/paulovillalobos/macro-vintages)"
 
 
 def http_client(settings: Settings) -> httpx.AsyncClient:

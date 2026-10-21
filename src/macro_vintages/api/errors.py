@@ -14,7 +14,7 @@ from macro_vintages.logs import request_id_var
 
 log = logging.getLogger(__name__)
 
-PROBLEM_TYPE_BASE = "https://github.com/imperiobaal69-web/macro-vintages/blob/main/docs/API.md#"
+PROBLEM_TYPE_BASE = "https://github.com/paulovillalobos/macro-vintages/blob/main/docs/API.md#"
 
 
 class ApiError(Exception):
